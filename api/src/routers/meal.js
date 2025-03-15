@@ -1,30 +1,13 @@
-import express from "express";
+import express, { query } from "express";
 import knex from "../database_client.js";
 
 const mealRouter = express.Router();
-
-// mealRouter.get("/:id", async (req, res) => {
-//   const mealID = req.params.id;
-//   try {
-//     const meal_with_id = await knex("Meal").select("*").where({ id: mealID });
-//     if (meal_with_id.length === 0) {
-//       res
-//         .status(404)
-//         .json({ message: `can't find any meal with the id: ${req.params.id}` });
-//       return;
-//     }
-//     res.status(200).json(meal_with_id[0]);
-//   } catch (error) {
-//     console.error("Error fetching tables:", error);
-//     res.status(500).json({ error: "Internal Server Error" });
-//   }
-// });
 
 // future-meals
 
 mealRouter.get("/future-meals", async (req, res) => {
   try {
-    const meals = await knex.raw("select title from Meal  `when` > NOW()");
+    const meals = await knex.raw("select title from Meal WHERE `when` > NOW()");
     res.json(meals[0]);
   } catch (error) {
     console.error("Now catching food has porblem:", error);
@@ -85,4 +68,64 @@ mealRouter.get("/last-meal", async (req, res) => {
 });
 
 
-export default mealRouter;
+mealRouter.get("/meals", async (req, res) => {
+  try {
+    let query = knex("Meal");
+
+    // Filter by maxPrice
+
+    if (req.query.maxPrice) {
+      query = query.where("price", "<=", Number(req.query.maxPrice));
+    }
+
+    // Filter by availableReservations
+
+    if (req.query.availableReservations) {
+      const available = req.query.availableReservations === "true";
+      query = query.leftJoin("Reservation", "Meal.id", "=", "Reservation.meal_id")
+                   .groupBy("Meal.id")
+                   .havingRaw(available ? "SUM(Reservation.number_of_guests) < Meal.max_reservations" : "SUM(Reservation.number_of_guests) >= Meal.max_reservations");
+    }
+
+    // Filter by title
+
+    if (req.query.title) {
+      query = query.where("title", "like", `%${req.query.title}%`);
+    }
+
+    // Filter by dateAfter
+
+    if (req.query.dateAfter) {
+      query = query.where("when", ">", req.query.dateAfter);
+    }
+
+    // Filter by dateBefore
+
+    if (req.query.dateBefore) {
+      query = query.where("when", "<", req.query.dateBefore);
+    }
+
+    // Sorting by sortKey and sortDir
+
+    if (req.query.sortKey) {
+      const validKeys = ["when", "max_reservations", "price"];
+      if (validKeys.includes(req.query.sortKey)) {
+        const sortDirection = req.query.sortDir === "desc" ? "desc" : "asc";
+        query = query.orderBy(req.query.sortKey, sortDirection);
+      }
+    }
+
+    // Limit results
+
+    if (req.query.limit) {
+      query = query.limit(Number(req.query.limit));
+    }
+
+    const meals = await query;
+    res.json(meals);
+  } catch (error) {
+    console.error("Error fetching meals:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+export default mealRouter
