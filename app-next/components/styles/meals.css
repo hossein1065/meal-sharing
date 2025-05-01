@@ -1,0 +1,19 @@
+.card {
+  border: 1px solid #ccc;
+  padding: 20px;
+  margin-bottom: 10px;
+}
+
+.title {
+  font-size: 1.5em;
+  font-weight: bold;
+}
+
+.description {
+  font-size: 1em;
+}
+
+.price {
+  color: green;
+  font-weight: bold;
+}
