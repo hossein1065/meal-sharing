@@ -1,22 +1,20 @@
-import express, { query } from "express";
+import express from "express";
 import knex from "../database_client.js";
 
 const mealRouter = express.Router();
 
-// future-meals
-
+// GET /future-meals
 mealRouter.get("/future-meals", async (req, res) => {
   try {
-    const meals = await knex.raw("select title from Meal WHERE `when` > NOW()");
+    const meals = await knex.raw("SELECT title FROM Meal WHERE `when` > NOW()");
     res.json(meals[0]);
   } catch (error) {
-    console.error("Now catching food has porblem:", error);
+    console.error("Error fetching future meals:", error);
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
 
-//past-meals
-
+// GET /past-meals
 mealRouter.get("/past-meals", async (req, res) => {
   try {
     const meals = await knex.raw("SELECT * FROM Meal WHERE `when` < NOW()");
@@ -27,8 +25,7 @@ mealRouter.get("/past-meals", async (req, res) => {
   }
 });
 
-// all-meals
-
+// GET /all-meals
 mealRouter.get("/all-meals", async (req, res) => {
   try {
     const meals = await knex.raw("SELECT * FROM Meal ORDER BY id ASC");
@@ -39,7 +36,7 @@ mealRouter.get("/all-meals", async (req, res) => {
   }
 });
 
-// first-meal
+// GET /first-meal
 mealRouter.get("/first-meal", async (req, res) => {
   try {
     const meals = await knex.raw("SELECT * FROM Meal ORDER BY id ASC LIMIT 1");
@@ -53,7 +50,7 @@ mealRouter.get("/first-meal", async (req, res) => {
   }
 });
 
-// last-meal
+// GET /last-meal
 mealRouter.get("/last-meal", async (req, res) => {
   try {
     const meals = await knex.raw("SELECT * FROM Meal ORDER BY id DESC LIMIT 1");
@@ -67,45 +64,38 @@ mealRouter.get("/last-meal", async (req, res) => {
   }
 });
 
-
+// GET /meals - with filters
 mealRouter.get("/meals", async (req, res) => {
   try {
     let query = knex("Meal");
-
-    // Filter by maxPrice
 
     if (req.query.maxPrice) {
       query = query.where("price", "<=", Number(req.query.maxPrice));
     }
 
-    // Filter by availableReservations
-
     if (req.query.availableReservations) {
       const available = req.query.availableReservations === "true";
-      query = query.leftJoin("Reservation", "Meal.id", "=", "Reservation.meal_id")
-                   .groupBy("Meal.id")
-                   .havingRaw(available ? "SUM(Reservation.number_of_guests) < Meal.max_reservations" : "SUM(Reservation.number_of_guests) >= Meal.max_reservations");
+      query = query
+        .leftJoin("Reservation", "Meal.id", "Reservation.meal_id")
+        .groupBy("Meal.id")
+        .havingRaw(
+          available
+            ? "SUM(Reservation.number_of_guests) < Meal.max_reservations"
+            : "SUM(Reservation.number_of_guests) >= Meal.max_reservations"
+        );
     }
-
-    // Filter by title
 
     if (req.query.title) {
       query = query.where("title", "like", `%${req.query.title}%`);
     }
 
-    // Filter by dateAfter
-
     if (req.query.dateAfter) {
       query = query.where("when", ">", req.query.dateAfter);
     }
 
-    // Filter by dateBefore
-
     if (req.query.dateBefore) {
       query = query.where("when", "<", req.query.dateBefore);
     }
-
-    // Sorting by sortKey and sortDir
 
     if (req.query.sortKey) {
       const validKeys = ["when", "max_reservations", "price"];
@@ -114,8 +104,6 @@ mealRouter.get("/meals", async (req, res) => {
         query = query.orderBy(req.query.sortKey, sortDirection);
       }
     }
-
-    // Limit results
 
     if (req.query.limit) {
       query = query.limit(Number(req.query.limit));
@@ -128,4 +116,30 @@ mealRouter.get("/meals", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
-export default mealRouter
+
+// ✅ GET /meals/:id - specific meal with total guests
+mealRouter.get("/meals/:id", async (req, res) => {
+  const mealId = req.params.id;
+
+  try {
+    const [meal] = await knex("Meal")
+      .leftJoin("Reservation", "Meal.id", "Reservation.meal_id")
+      .select(
+        "Meal.*",
+        knex.raw("COALESCE(SUM(Reservation.number_of_guests), 0) AS total_guests")
+      )
+      .where("Meal.id", mealId)
+      .groupBy("Meal.id");
+
+    if (!meal) {
+      return res.status(404).json({ error: "Meal not found" });
+    }
+
+    res.json(meal);
+  } catch (error) {
+    console.error("Error fetching meal by ID:", error);
+    res.status(500).json({ error: "Internal Server Error" });
+  }
+});
+
+export default mealRouter;

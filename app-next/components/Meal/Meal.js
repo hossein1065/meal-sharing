@@ -1,10 +1,21 @@
 import React from "react";
-
+import Link from "next/link";
 
 const Meal = ({ meal }) => {
   return (
-    <div style={{textAlign:"center"}}>  
-      <h2 style={{color:"red", border:"5px solid #ccc", width:"150px", borderRadius:"20px" , margin:"0 auto"}}>{meal.title}</h2>
+    <div style={{ marginBottom: "20px", textAlign: "center" }}>
+      <Link href={`/meals/${meal.id}`}>
+        <h2 style={{
+          color: "red",
+          border: "2px solid lightgray",
+          padding: "5px",
+          borderRadius: "10px",
+          display: "inline-block",
+          cursor: "pointer"
+        }}>
+          {meal.title}
+        </h2>
+      </Link>
       <p>{meal.description}</p>
       <p>Price: {meal.price} DKK</p>
     </div>
@@ -12,4 +23,5 @@ const Meal = ({ meal }) => {
 };
 
 export default Meal;
+
 

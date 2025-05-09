@@ -20,7 +20,7 @@ reviewRouter.get('/reviews', async (req, res) => {
     const { meal_id } = req.params;
     try {
       const reviews = await knex('Review').where('meal_id',req.params.meal_id);
-      res.json(mealReviews);
+      res.json(reviews);
     } catch (error) {
       console.error("Error fetching reviews for meal:", error);
       res.status(500).json({ error: "internal Server Error"});
